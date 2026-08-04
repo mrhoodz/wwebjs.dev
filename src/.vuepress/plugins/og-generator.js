@@ -193,26 +193,44 @@ export const ogGeneratorPlugin = (options = {}) => ({
       const filename = `${slug}.png`;
       const imageUrl = `${domain}/images/og-gen/${filename}`;
 
-      // Render image using takumi.js
+      // Render image using custom og-index.png for index page, or takumi.js for other pages
       try {
-        const html = createOgHtmlTemplate({ title, description, templateDataUrl });
-        const { node, stylesheets } = fromHtml(html);
-        const imageBuffer = await render(node, {
-          width: 1834,
-          height: 963,
-          stylesheets,
-          fonts
-        });
+        let compressedBuffer;
+        const customIndexImagePath = path.resolve(
+          app.dir.source(),
+          '.vuepress/public/images/og-index.png'
+        );
 
-        // Compress entire generated image using sharp
-        const compressedBuffer = await sharp(imageBuffer)
-          .png({
-            palette: true,
-            quality: 90,
-            compressionLevel: 9,
-            effort: 10
-          })
-          .toBuffer();
+        if (slug === 'index' && fs.existsSync(customIndexImagePath)) {
+          const rawBuffer = fs.readFileSync(customIndexImagePath);
+          compressedBuffer = await sharp(rawBuffer)
+            .png({
+              palette: true,
+              quality: 90,
+              compressionLevel: 9,
+              effort: 10
+            })
+            .toBuffer();
+        } else {
+          const html = createOgHtmlTemplate({ title, description, templateDataUrl });
+          const { node, stylesheets } = fromHtml(html);
+          const imageBuffer = await render(node, {
+            width: 1834,
+            height: 963,
+            stylesheets,
+            fonts
+          });
+
+          // Compress entire generated image using sharp
+          compressedBuffer = await sharp(imageBuffer)
+            .png({
+              palette: true,
+              quality: 90,
+              compressionLevel: 9,
+              effort: 10
+            })
+            .toBuffer();
+        }
 
         // Save PNG to public output directories
         for (const dir of publicDirs) {
